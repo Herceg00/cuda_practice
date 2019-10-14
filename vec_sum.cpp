@@ -83,6 +83,7 @@ int main(int argc, char** argv){
     ArrayDevice<int> C_d(values_num);
 
     cudaMemcpy(A_d.get_values(),A.get_values(),A.get_size(),cudaMemcpyHostToDevice);
+    cudaMemcpy(B_d.get_values(),B.get_values(),B.get_size(),cudaMemcpyHostToDevice);
     sum_on_host(A.get_values(),B.get_values(),HostSum.get_values(),values_num);
 
     checkResult(HostSum.get_values(),Device_to_HostSum.get_values(),values_num);
