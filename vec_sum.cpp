@@ -108,7 +108,7 @@ int main(int argc, char** argv){
     dim3 block(max_threads_for_block);
     dim3 grid ((values_num / max_threads_for_block) + 1);
 
-    sum_on_device  <<<grid,block>>>(A_d.get_values(),B_d.get_values(),C_d.get_values());
+    sum_on_device <int> <<<grid,block>>>(A_d.get_values(),B_d.get_values(),C_d.get_values());
 
     cudaMemcpy(Device_to_HostSum.get_values(),C_d.get_values(),A_h.get_size(),cudaMemcpyDeviceToHost);
 
