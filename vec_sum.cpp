@@ -2,7 +2,13 @@
 #include <cuda_runtime.h>
 #include <sys/time.h>
 #include <cmath>
-#include <chrono>
+
+double cpuSecond(){
+    struct timeval tp;
+    gettimeofday(&tp,NULL);
+    return ((double)tp.tv_sec + (double)tp.tv_usec*1.e-6);
+
+}
 
 
 template <class T>
@@ -55,12 +61,12 @@ template <typename type>
 void checkResult(type *host_array,type *device_array,const long array_size){
     double epsilon  = 0.1;
     for (long i=0;i<array_size;i++){
-        if(device_array[i] - host_array[i] > epsilon){
+        if(abs(device_array[i] - host_array[i]) > epsilon){
             std::cout<<"ERROR in %ld position"<<i;
             break;
         }
     }
-    printf("SUCCESS");
+    std::cout<<"SUCCESS\n";
 }
 
 template <typename type>
@@ -80,10 +86,9 @@ __global__ void sum_on_device(type *A, type *B, type *C) {
 int main(int argc, char** argv){
 
     using namespace std;
-    //long values_num = atoi(argv[1]);
-    long values_num = 1030;
+    long values_num = atoi(argv[1]);
+    //long values_num = 1070;
     //cout<<values_num;
-    int dev = 0;
     ArrayHost<int> A_h (values_num);
     ArrayHost<int> B_h (values_num);
 
@@ -93,26 +98,39 @@ int main(int argc, char** argv){
     ArrayHost<int> HostSum(values_num);
     ArrayHost<int> Device_to_HostSum(values_num);
 
-
+    double start_on_host = cpuSecond();
     sum_on_host(A_h.get_values(),B_h.get_values(),HostSum.get_values(),values_num);
-
+    double end_on_host = cpuSecond();
 
     ArrayDevice<int> A_d(values_num);
     ArrayDevice<int> B_d(values_num);
     ArrayDevice<int> C_d(values_num);
 
-    cudaMemcpy(A_d.get_values(),A_h.get_values(),A_h.get_size(),cudaMemcpyHostToDevice);
-    cudaMemcpy(B_d.get_values(),B_h.get_values(),B_h.get_size(),cudaMemcpyHostToDevice);
-
     int max_threads_for_block = 512;
     dim3 block(max_threads_for_block);
     dim3 grid ((values_num / max_threads_for_block) + 1);
 
+    double start_copy  = cpuSecond();
+    cudaMemcpy(A_d.get_values(),A_h.get_values(),A_h.get_size(),cudaMemcpyHostToDevice);
+    cudaMemcpy(B_d.get_values(),B_h.get_values(),B_h.get_size(),cudaMemcpyHostToDevice);
+
+    double start_count = cpuSecond();
     sum_on_device <int> <<<grid,block>>>(A_d.get_values(),B_d.get_values(),C_d.get_values());
+    cudaDeviceSynchronize();
+    double end_count = cpuSecond();
 
     cudaMemcpy(Device_to_HostSum.get_values(),C_d.get_values(),A_h.get_size(),cudaMemcpyDeviceToHost);
 
+    double end_copy = cpuSecond();
+
     checkResult(HostSum.get_values(),Device_to_HostSum.get_values(),values_num);
+
+    std::cout<<"CPU PROCESSING TIME: " << (end_on_host-start_on_host)<<"\n";
+    std::cout<<"GPU PROCESSING TIME WITH DATA COPYING: " << (end_copy - start_copy)<<"\n";
+    std::cout<<"GPU PROCCESING TIME WITHOUT DATA COPYING: "  << (end_count- start_count)<<"\n";
+
+    std::cout << "GPU ACCELERATION WITH COPYING: " << (end_on_host - start_on_host)/(end_copy - start_copy)<< "\n";
+    std::cout<< "GPU ACCELERAION WITHOUT COPYING " << (end_on_host - start_on_host)/(end_count - start_count) << "\n";
 
 
 };
