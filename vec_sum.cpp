@@ -120,7 +120,7 @@ int main(int argc, char** argv){
     cudaMemcpy(A_d.get_values(),A_h.get_values(),A_h.get_size(),cudaMemcpyHostToDevice);
     cudaMemcpy(B_d.get_values(),B_h.get_values(),B_h.get_size(),cudaMemcpyHostToDevice);
 
-    //double start_count = cpuSecond();
+    double start_count = cpuSecond();
 
     cudaEventRecord(start);
     double start_count = cpuSecond();
@@ -149,7 +149,7 @@ int main(int argc, char** argv){
     std::cout<<"GPU PROCCESING TIME WITHOUT DATA COPYING: "  << time<<"\n";
     std::cout<<"GPU BANDWITH: "  << 3*A_h.get_size()/time<<"\n";
 
-    std::cout<<"NVLINK BANDWITH: "  << 2*(A_h.get_size())/(end_count - start_count)<<"\n";
+    std::cout<<"NVLINK BANDWITH: "  << 2*(A_h.get_size())/(start_count - start_copy)<<"\n";
 
     //std::cout << "GPU ACCELERATION WITH COPYING: " << (end_on_host - start_on_host)/(end_copy - start_copy)<< "\n";
     //std::cout<< "GPU ACCELERAION WITHOUT COPYING " << (end_on_host - start_on_host)/(end_count - start_count) << "\n";
