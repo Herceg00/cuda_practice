@@ -114,7 +114,7 @@ int main(int argc, char** argv){
 
     int max_threads_for_block = 512;
     dim3 block(max_threads_for_block);
-    dim3 grid ((values_num / max_threads_for_block) + 1);
+    dim3 grid ((values_num + max_threads_for_block - 1)/ max_threads_for_block);
 
     double start_copy  = cpuSecond();
     cudaMemcpy(A_d.get_values(),A_h.get_values(),A_h.get_size(),cudaMemcpyHostToDevice);
