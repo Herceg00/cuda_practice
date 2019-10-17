@@ -86,9 +86,15 @@ __global__ void sum_on_device(type *A, type *B, type *C) {
 int main(int argc, char** argv){
 
     using namespace std;
-    long values_num = atoi(argv[1]);
-    //long values_num = 1070;
+    //long values_num = atoi(argv[1]);
+    long values_num = 1070;
     //cout<<values_num;
+
+    cudaEvent_t start,stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+
     ArrayHost<int> A_h (values_num);
     ArrayHost<int> B_h (values_num);
 
@@ -114,10 +120,23 @@ int main(int argc, char** argv){
     cudaMemcpy(A_d.get_values(),A_h.get_values(),A_h.get_size(),cudaMemcpyHostToDevice);
     cudaMemcpy(B_d.get_values(),B_h.get_values(),B_h.get_size(),cudaMemcpyHostToDevice);
 
+    //double start_count = cpuSecond();
+
+    cudaEventRecord(start);
     double start_count = cpuSecond();
     sum_on_device <int> <<<grid,block>>>(A_d.get_values(),B_d.get_values(),C_d.get_values());
-    cudaDeviceSynchronize();
     double end_count = cpuSecond();
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+
+    float time;
+    cudaEventElapsedTime(&time,start,stop);
+
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+
+    //cudaDeviceSynchronize();
+    //double end_count = cpuSecond();
 
     cudaMemcpy(Device_to_HostSum.get_values(),C_d.get_values(),A_h.get_size(),cudaMemcpyDeviceToHost);
 
@@ -127,10 +146,13 @@ int main(int argc, char** argv){
 
     std::cout<<"CPU PROCESSING TIME: " << (end_on_host-start_on_host)<<"\n";
     std::cout<<"GPU PROCESSING TIME WITH DATA COPYING: " << (end_copy - start_copy)<<"\n";
-    std::cout<<"GPU PROCCESING TIME WITHOUT DATA COPYING: "  << (end_count- start_count)<<"\n";
+    std::cout<<"GPU PROCCESING TIME WITHOUT DATA COPYING: "  << time<<"\n";
+    std::cout<<"GPU BANDWITH: "  << 3*A_h.get_size()/time<<"\n";
 
-    std::cout << "GPU ACCELERATION WITH COPYING: " << (end_on_host - start_on_host)/(end_copy - start_copy)<< "\n";
-    std::cout<< "GPU ACCELERAION WITHOUT COPYING " << (end_on_host - start_on_host)/(end_count - start_count) << "\n";
+    std::cout<<"NVLINK BANDWITH: "  << 2*(A_h.get_size())/(end_count - start_count)<<"\n";
+
+    //std::cout << "GPU ACCELERATION WITH COPYING: " << (end_on_host - start_on_host)/(end_copy - start_copy)<< "\n";
+    //std::cout<< "GPU ACCELERAION WITHOUT COPYING " << (end_on_host - start_on_host)/(end_count - start_count) << "\n";
 
 
 };
