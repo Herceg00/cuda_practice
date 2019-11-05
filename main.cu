@@ -57,7 +57,7 @@ template<typename type>
 __global__ void transpose_on_device1(type *A,type *B, long matrix_size) {
     int x = blockDim.x * blockIdx.x + threadIdx.x;
     int y = blockDim.y * blockIdx.y + threadIdx.y;
-    B[y*matrix_size + x] = A[x*matrix_size+y];
+    B[x*matrix_size + y] = A[y*matrix_size+x];
 }
 
 template<typename type>
@@ -101,7 +101,7 @@ void checkResult(type *host_array, type *device_array, const long array_size) {
     for (long i = 0; i < array_size*array_size; i++) {
             if (abs(device_array[i] - host_array[i]) > epsilon) {
                 std::cout << "ERROR in "<<i<< " position";
-                break;
+                //break;
             }
 
     }
@@ -161,6 +161,7 @@ int main(int argc,char** argv) {
     //cudaMemcpy(A_from_d.get_values(), B_d.get_values(), A_h.get_size(), cudaMemcpyDeviceToHost);
 
     checkResult<int>(A_from_d.get_values(), B_h.get_values(), matrix_size);
+
     std::cout<<"GPU BANDWIDTH: " << (A_h.get_size()*2)/(time_device*1000000)<<" GB/s\n";
     std::cout<<"Matrix size: " << A_h.get_size() <<" B\n";
     std::cout<<"TIME FOR HOST TRANSPOSE " << time_host<<" msec\n";
