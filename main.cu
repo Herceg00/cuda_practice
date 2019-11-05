@@ -109,9 +109,9 @@ void checkResult(type *host_array, type *device_array, const long array_size) {
 }
 
 
-int main(void) {
+int main(int argc,char** argv) {
 
-    int matrix_size = 1024;
+    int matrix_size = atoi(argv[1]);
 
     cudaEvent_t start_host,stop_host,start_device,stop_device;
     float time_host,time_device;
@@ -149,22 +149,22 @@ int main(void) {
 
     cudaEventRecord(start_device);
 
-    //transpose_on_device1<int> << < grid, block >> > (A_d.get_values(),B_d.get_values(), matrix_size);
+    transpose_on_device1<int> << < grid, block >> > (A_d.get_values(),B_d.get_values(), matrix_size);
     //transpose_on_device2<int> << < grid, block >> > (A_d.get_values(),matrix_size);
-    transpose_on_device3<int> << < grid, block >> > (A_d.get_values(),B_d.get_values(), matrix_size);
+    //transpose_on_device3<int> << < grid, block >> > (A_d.get_values(),B_d.get_values(), matrix_size);
     cudaEventRecord(stop_device);
     cudaEventSynchronize(stop_device);
     cudaEventElapsedTime(&time_device,start_device,stop_device);
 
-    //cudaMemcpy(A_from_d.get_values(), B_d.get_values(), A_h.get_size(), cudaMemcpyDeviceToHost);
-    //cudaMemcpy(A_from_d.get_values(), A_d.get_values(), A_h.get_size(), cudaMemcpyDeviceToHost);
     cudaMemcpy(A_from_d.get_values(), B_d.get_values(), A_h.get_size(), cudaMemcpyDeviceToHost);
+    //cudaMemcpy(A_from_d.get_values(), A_d.get_values(), A_h.get_size(), cudaMemcpyDeviceToHost);
+    //cudaMemcpy(A_from_d.get_values(), B_d.get_values(), A_h.get_size(), cudaMemcpyDeviceToHost);
 
     checkResult<int>(A_from_d.get_values(), B_h.get_values(), matrix_size);
-
-
-    std::cout<<"TIME FOR HOST TRANSPOSE " << time_host/1000<<" sec\n";
-    std::cout<<"TIME FOR DEVICE TRANSPOSE " << time_device/1000<<" sec\n";
+    std::cout<<"GPU BANDWIDTH: " << (A_h.get_size()*2)/(time_device*1000000)<<" GB/s\n";
+    std::cout<<"Matrix size: " << A_h.get_size() <<" B\n";
+    std::cout<<"TIME FOR HOST TRANSPOSE " << time_host<<" msec\n";
+    std::cout<<"TIME FOR DEVICE TRANSPOSE " << time_device<<" msec\n";
 
 
 }
