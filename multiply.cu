@@ -77,7 +77,7 @@ __global__ void KIJ(const type *A, const type *B,type *C,int matrix_size) {
     int i = blockIdx.y * BLOCK_DIM + threadIdx.y;
     float reg = A[i * matrix_size + k];
     for (int j = 0; j < matrix_size; j++) {
-        atomicAdd(&C[i*matrix_size + j] , reg *B[k*matrix_size +j]);
+        atomicAdd(&C[i*matrix_size + j] , reg * B[k*matrix_size +j]);
     }
 }
 
@@ -140,8 +140,17 @@ void checkResult(type *host_array, type *device_array, const long matrix_size) {
 }
 
 int main(int argc,char** argv) {
-    int matrix_size =  atoi(argv[1]);
 
+    cudaEvent_t start_host,stop_host,start_device,stop_device;
+    float time_host,time_device;
+
+    cudaEventCreate(&start_host);
+    cudaEventCreate(&stop_host);
+    cudaEventCreate(&start_device);
+    cudaEventCreate(&stop_device);
+
+
+    int matrix_size =  atoi(argv[1]);
     MatrixHost<float> A_h (matrix_size);
     MatrixHost<float> B_h (matrix_size);
     MatrixHost<float> C_h(matrix_size);
@@ -152,7 +161,12 @@ int main(int argc,char** argv) {
     A_h.Initialize_Matrix();
     B_h.Initialize_Matrix();
 
+    cudaEventRecord(start_host);
     multiply_on_host<float>(A_h.get_values(),B_h.get_values(),C_h.get_values(),matrix_size);
+    cudaEventRecord(stop_host);
+    cudaEventSynchronize(stop_host);
+    cudaEventElapsedTime(&time_host,start_host,stop_host);
+
 
     MatrixDevice <float> A_d(matrix_size);
     MatrixDevice <float> B_d(matrix_size);
@@ -163,11 +177,20 @@ int main(int argc,char** argv) {
 
     dim3 block(BLOCK_DIM,BLOCK_DIM,1);
     dim3 grid ((matrix_size+block.x-1)/block.x,(matrix_size+block.y-1)/block.y,1 );
-    KJI<float><<<grid,block>>>(A_d.get_values(),B_d.get_values(),C_d.get_values(),matrix_size);
+
+    cudaEventRecord(start_device);
+    IJK<float><<<grid,block>>>(A_d.get_values(),B_d.get_values(),C_d.get_values(),matrix_size);
+    cudaEventRecord(stop_device);
+    cudaEventSynchronize(stop_device);
+    cudaEventElapsedTime(&time_device,start_device,stop_device);
 
     cudaMemcpy(C_from_d.get_values(), C_d.get_values(), A_h.get_size(), cudaMemcpyDeviceToHost);
 
 
     checkResult<float>(C_h.get_values(),C_from_d.get_values(),matrix_size);
+
+    //std::cout<<"CPU PERFORMANCE: " << (matrix_size*matrix_size*matrix_size)/(time_host)<<" FLOPS\n";
+    std::cout<<"GPU PERFORMANCE: " << (matrix_size*matrix_size*matrix_size)/(time_device)<<" FLOPS\n";
+
 
 }
