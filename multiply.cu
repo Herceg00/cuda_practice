@@ -4,6 +4,9 @@
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
 #define BLOCK_DIM 32
+#define TILE_DIM 32
+#define BLOCK_ROWS 8
+
 
 template<class T>
 class MatrixHost {
@@ -155,8 +158,21 @@ __global__ void cublas_multiply(const type *A, const type *B,type *C, int matrix
     cublasHandle_t handle;
     cublasCreate(&handle);
 
-    cublasSgemm(handle,CUBLAS_OP_N,CUBLAS_OP_N,matrix_size,matrix_size,matrix_size,alph_point,A,matrix_size,B,matrix_size,betta_point,C,matrix_size);
+    cublasSgemm(handle,CUBLAS_OP_T,CUBLAS_OP_N,matrix_size,matrix_size,matrix_size,alph_point,A,matrix_size,B,matrix_size,betta_point,C,matrix_size);
     cublasDestroy(handle);
+}
+
+template <typename type>
+__global__ void transposeNaive(type *odata, const type *idata)
+{
+    int x = blockIdx.x * TILE_DIM + threadIdx.x;
+    int y = blockIdx.y * TILE_DIM + threadIdx.y;
+    int width = gridDim.x * TILE_DIM;
+
+    for (int j = 0; j < TILE_DIM; j+= BLOCK_ROWS) {
+        odata[x * width + (y + j)] = idata[(y + j) * width + x];
+    }
+    __syncthreads();
 }
 
 
@@ -190,6 +206,8 @@ int main(int argc,char** argv) {
     A_h.Initialize_Matrix();
     B_h.Initialize_Matrix();
 
+
+
     cudaEventRecord(start_host);
     multiply_on_host<float>(A_h.get_values(),B_h.get_values(),C_h.get_values(),matrix_size);
     cudaEventRecord(stop_host);
@@ -200,6 +218,7 @@ int main(int argc,char** argv) {
     MatrixDevice <float> A_d(matrix_size);
     MatrixDevice <float> B_d(matrix_size);
     MatrixDevice <float> C_d(matrix_size);
+    MatrixDevice <float> A_dt(matrix_size);
 
     cudaMemcpy(A_d.get_values(), A_h.get_values(), A_h.get_size(), cudaMemcpyHostToDevice);
     cudaMemcpy(B_d.get_values(), B_h.get_values(), A_h.get_size(), cudaMemcpyHostToDevice);
@@ -207,9 +226,12 @@ int main(int argc,char** argv) {
     dim3 block(BLOCK_DIM,BLOCK_DIM,1);
     dim3 grid ((matrix_size+block.x-1)/block.x,(matrix_size+block.y-1)/block.y,1 );
 
-    cublas_multiply<float><<<grid,block>>>(A_d.get_values(),B_d.get_values(),C_d.get_values(),matrix_size);
+
+    transposeNaive<float> <<<grid,block>>>(A_dt.get_values(),A_d.get_values());
+    
+    cublas_multiply<float><<<grid,block>>>(A_dt.get_values(),B_d.get_values(),C_d.get_values(),matrix_size);
     cudaEventRecord(start_device);
-    cublas_multiply<float><<<grid,block>>>(A_d.get_values(),B_d.get_values(),C_d.get_values(),matrix_size);
+    cublas_multiply<float><<<grid,block>>>(A_dt.get_values(),B_d.get_values(),C_d.get_values(),matrix_size);
     cudaEventRecord(stop_device);
     cudaEventSynchronize(stop_device);
 
