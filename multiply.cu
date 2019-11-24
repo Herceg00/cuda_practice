@@ -1,5 +1,8 @@
 #include <iostream>
 #include "cuda_runtime.h"
+#include <cublas_v2.h>
+#include <thrust/host_vector.h>
+#include <thrust/device_vector.h>
 #define BLOCK_DIM 32
 
 template<class T>
@@ -30,6 +33,7 @@ public:
         delete []values;
     }
 };
+
 
 template<class T>
 class MatrixDevice{
@@ -131,30 +135,55 @@ void multiply_on_host(const type *A, const type *B,type *C,int matrix_size) {
 template <typename type>
 void checkResult(type *host_array, type *device_array, const long matrix_size) {
     double epsilon = 0.1;
+    int pos = 0;
     for (long i = 0; i < matrix_size; i++) {
         if (abs(device_array[i] - host_array[i]) > epsilon) {
-            std::cout <<i;
+            pos++;
         }
     }
-    std::cout << "SUCCESS\n";
+    std::cout << "SUCCESS\n"<<pos;
 }
+
+
+template <typename type>
+__global__ void cublas_multiply(const type *A, const type *B,type *C, int matrix_size) {
+    //int dima = matrix_size,dimB =matrix_size , dimC =matrix_size;
+    float alpha = 1.0;
+    float betta =0.0;
+    float* alph_point= &alpha;
+    float* betta_point = &betta;
+    cublasHandle_t handle;
+    cublasCreate(&handle);
+
+    cublasSgemm(handle,CUBLAS_OP_N,CUBLAS_OP_N,matrix_size,matrix_size,matrix_size,alph_point,A,matrix_size,B,matrix_size,betta_point,C,matrix_size);
+    cublasDestroy(handle);
+}
+
+
+
 
 int main(int argc,char** argv) {
 
     cudaEvent_t start_host,stop_host,start_device,stop_device;
     float time_host,time_device;
-
+    int version;
     cudaEventCreate(&start_host);
     cudaEventCreate(&stop_host);
     cudaEventCreate(&start_device);
     cudaEventCreate(&stop_device);
+
+    cublasHandle_t handle;
+    cublasCreate(&handle);
+    cublasGetVersion(handle,&version);
+    std::cout<<"cuBLAS version: " << version<<"\n";
+
 
 
     int matrix_size =  atoi(argv[1]);
     MatrixHost<float> A_h (matrix_size);
     MatrixHost<float> B_h (matrix_size);
     MatrixHost<float> C_h(matrix_size);
-    MatrixHost<float>C_from_d (matrix_size);
+    MatrixHost<float>C_from_cublas (matrix_size);
 
 
 
@@ -178,19 +207,23 @@ int main(int argc,char** argv) {
     dim3 block(BLOCK_DIM,BLOCK_DIM,1);
     dim3 grid ((matrix_size+block.x-1)/block.x,(matrix_size+block.y-1)/block.y,1 );
 
+    cublas_multiply<float><<<grid,block>>>(A_d.get_values(),B_d.get_values(),C_d.get_values(),matrix_size);
     cudaEventRecord(start_device);
-    IJK<float><<<grid,block>>>(A_d.get_values(),B_d.get_values(),C_d.get_values(),matrix_size);
+    cublas_multiply<float><<<grid,block>>>(A_d.get_values(),B_d.get_values(),C_d.get_values(),matrix_size);
     cudaEventRecord(stop_device);
     cudaEventSynchronize(stop_device);
+
+
+
     cudaEventElapsedTime(&time_device,start_device,stop_device);
 
-    cudaMemcpy(C_from_d.get_values(), C_d.get_values(), A_h.get_size(), cudaMemcpyDeviceToHost);
+    cudaMemcpy(C_from_cublas.get_values(), C_d.get_values(), A_h.get_size(), cudaMemcpyDeviceToHost);
 
 
-    checkResult<float>(C_h.get_values(),C_from_d.get_values(),matrix_size);
 
-    //std::cout<<"CPU PERFORMANCE: " << (matrix_size*matrix_size*matrix_size)/(time_host)<<" FLOPS\n";
+
+    checkResult<float>(C_h.get_values(),C_from_cublas.get_values(),matrix_size*matrix_size);
+
+    cublasDestroy(handle);
     std::cout<<"GPU PERFORMANCE: " << (matrix_size*matrix_size*matrix_size)/(time_device)<<" FLOPS\n";
-
-
 }
