@@ -51,23 +51,21 @@ int main(int argc, char **argv) {
     long matrix_size = atol(argv[1]);
 
 
-    thrust::host_vector<float> A_h(matrix_size*matrix_size);
-    //Initialize_Matrix(thrust::raw_pointer_cast(&A_h[0]),matrix_size*matrix_size);
-
-    thrust::sequence(A_h.begin(), A_h.end());
-
-    thrust::host_vector<float> B_h(matrix_size*matrix_size);
-
-    thrust::sequence(B_h.begin(), B_h.end());
-
-    //Initialize_Matrix(thrust::raw_pointer_cast(&B_h[0]),matrix_size*matrix_size);
+    //thrust::host_vector<float> A_h(matrix_size*matrix_size);
 
 
+    //thrust::sequence(A_h.begin(), A_h.end());
 
+    //thrust::host_vector<float> B_h(matrix_size*matrix_size);
+
+    //thrust::sequence(B_h.begin(), B_h.end());
+
+    
     thrust::device_vector<float> A_d(matrix_size*matrix_size);
-    A_d = A_h;
     thrust::device_vector<float> B_d(matrix_size*matrix_size);
-    B_d  = B_h;
+    Initialize_Matrix(thrust::raw_pointer_cast(&A_d[0]),matrix_size*matrix_size);
+    Initialize_Matrix(thrust::raw_pointer_cast(&B_d[0]),matrix_size*matrix_size);
+
 
 
     thrust::device_vector<float> C_d(matrix_size*matrix_size);
