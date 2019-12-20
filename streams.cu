@@ -51,7 +51,6 @@ public:
         cudaFree(values);
     }
 };
-
 template <typename type>
 void sum_on_host(type *A,type *B, type *C,long N){
     for(long i =0;i<N;i++){
@@ -64,18 +63,18 @@ void checkResult(type *host_array,type *device_array,const long array_size){
     double epsilon  = 1;
     for (long i=0;i<array_size;i++){
         if(abs(device_array[i] - host_array[i]) > epsilon){
-            std::cout<<"ERROR in %ld position"<<i;
-            break;
+            std::cout<<"ERROR in %ld position"<<i<<"   "<<device_array[i]<<"    "<<host_array[i]<<std::endl;
         }
     }
     std::cout<<"SUCCESS\n";
 }
 
 template <typename type>
-__global__ void sum_on_device(type *A, type *B, type *C, long array_size,long offset) {
+__global__ void sum_on_device(type *A, type *B, type *C,long left_bound, long right_bound) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if (i < array_size) {
-        C[i+offset] = A[i+offset] + B[i+offset];
+    if ((i>=left_bound)&&(i<right_bound)) {
+        printf("THREAD %d, A %f , B %f  %ld \n",i,A[i],B[i],left_bound);
+        C[i] = A[i] + B[i];
     }
 }
 
@@ -106,20 +105,32 @@ int main(int argc, char **argv) {
 
     int max_threads_for_block = 1024;
     dim3 block(max_threads_for_block);
-    dim3 grid ((array_size + max_threads_for_block - 1)/ max_threads_for_block);
+    dim3 grid (array_size + max_threads_for_block - 1 /max_threads_for_block);
 
     for (int i = 0; i < n_streams; i++) {
         long offset = i * block_for_stream;
         cudaMemcpyAsync(&((A_d.get_values())[offset]),&((A_h.get_values())[offset]),block_for_stream* sizeof(float),cudaMemcpyHostToDevice,stream_array[i]);
         cudaMemcpyAsync(&((B_d.get_values())[offset]),&((B_h.get_values())[offset]),block_for_stream* sizeof(float),cudaMemcpyHostToDevice,stream_array[i]);
-        sum_on_device<float><<<grid,block>>>(A_d.get_values(),B_d.get_values(),C_d.get_values(),array_size,offset);
+    }
+    for (int i = 0; i < n_streams; i++) {
+        long piece_for_stream = array_size / n_streams;
+        long left_bound  = i*piece_for_stream;
+        long right_bound = left_bound + piece_for_stream;
+        sum_on_device<float><<<grid,block,0,stream_array[i]>>>((A_d.get_values()),(B_d.get_values()),(C_d.get_values()),left_bound,right_bound);
+    }
+
+    for (int i = 0; i < n_streams; i++) {
+        long offset = i * block_for_stream;
         cudaMemcpyAsync(&((C_from_d.get_values())[offset]),&((C_d.get_values())[offset]),block_for_stream* sizeof(float),cudaMemcpyDeviceToHost,stream_array[i]);
     }
+
+
     cudaDeviceSynchronize();
 
     for (int i = 0; i < n_streams; i++) {
         cudaStreamDestroy(stream_array[i]);
     }
+
 
     free(stream_array);
     checkResult(C_h.get_values(),C_from_d.get_values(),array_size);
