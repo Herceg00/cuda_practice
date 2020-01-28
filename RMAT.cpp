@@ -16,31 +16,20 @@ using namespace std;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template <typename _T>
-_T rand_uniform_val(int _upper_border)
-{
-    return (_T)(rand() % _upper_border);
+void convert_to_CSR(int *src_ids, int* dst_ids, int _vertices_count, long _edges_count, int* v_array, int *e_array){
+    int position = 0;
+    for(int vertice = 0; vertice < _vertices_count; vertice++){
+        int count = 0;
+        for (int i =0; i<_edges_count;i++){
+            if(src_ids[i] == vertice) {
+                count++;
+                e_array[position+count-1] = dst_ids[i];
+            }
+        }
+        v_array[vertice] = position;
+        position+=count;
+    }
 }
-
-template <>
-int rand_uniform_val(int _upper_border)
-{
-    return (int)(rand() % _upper_border);
-}
-
-template <>
-float rand_uniform_val(int _upper_border)
-{
-    return (float)(rand() % _upper_border) / _upper_border;
-}
-
-template <>
-double rand_uniform_val(int _upper_border)
-{
-    return (double)(rand() % _upper_border) / _upper_border;
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void uniform_random(int *src_ids, int *dst_ids, float *weights, int _vertices_count, long _edges_count, int _omp_threads,  bool _directed, bool _weighted)
 {
@@ -162,20 +151,48 @@ int main(int argc, char **argv)
     {
         int threads = omp_get_max_threads();
 
-        int vertices_count = pow(2.0, 4);
-        long long edges_count = 3 * (long long)vertices_count;
+        int vertices_count = 5;
+        long long edges_count = 8;
 
         int *src_ids = new int[edges_count];
         int *dst_ids = new int[edges_count];
         float *weights = new float[edges_count];
 
-        R_MAT(src_ids, dst_ids, weights, vertices_count, edges_count, 45, 20, 20, 15, threads, true, true);
+        //R_MAT(src_ids, dst_ids, weights, vertices_count, edges_count, 45, 20, 20, 15, threads, true, true);
+
         uniform_random(src_ids, dst_ids, weights, vertices_count, edges_count, threads, true, true);
+
+
+        for(int i=0; i< edges_count;i++){
+            cout << src_ids[i] <<"----"<<dst_ids[i]<<endl;
+
+        }
+
+        int *v_array = new int[vertices_count];
+        int *e_array = new int[edges_count];
+
+
+        convert_to_CSR(src_ids,dst_ids,vertices_count,edges_count,v_array,e_array);
+
+
+        cout<<"CSR FORMAT"<<endl;
+
+        for(int i=0; i< vertices_count;i++){
+            cout << v_array[i] <<endl;
+
+        }
+        cout<<endl;
+        for(int i=0; i< edges_count;i++){
+            cout << e_array[i] <<endl;
+
+        }
 
 
         delete[] src_ids;
         delete[] dst_ids;
         delete[] weights;
+        delete [] e_array;
+        delete [] v_array;
     }
     catch (const char *error)
     {
